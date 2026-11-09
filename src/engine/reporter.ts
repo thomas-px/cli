@@ -352,6 +352,45 @@ export function reportJSON(
   console.log(formatJSON(payload, forcePretty));
 }
 
+interface AnnotationLocation {
+  file?: string;
+  line?: number;
+  endLine?: number;
+}
+
+function escapeAnnotationData(value: string): string {
+  return value
+    .replaceAll("%", "%25")
+    .replaceAll("\r", "%0D")
+    .replaceAll("\n", "%0A");
+}
+
+function escapeAnnotationProperty(value: string): string {
+  return escapeAnnotationData(value)
+    .replaceAll(":", "%3A")
+    .replaceAll(",", "%2C");
+}
+
+function annotation(
+  level: "error" | "warning" | "notice",
+  title: string,
+  message: string,
+  location: AnnotationLocation = {}
+): string {
+  const properties: string[] = [];
+  if (location.file !== undefined && location.file !== "") {
+    properties.push(`file=${escapeAnnotationProperty(location.file)}`);
+    if (location.line !== undefined && location.line !== 0) {
+      properties.push(`line=${location.line}`);
+      if (location.endLine !== undefined && location.endLine !== 0) {
+        properties.push(`endLine=${location.endLine}`);
+      }
+    }
+  }
+  properties.push(`title=${escapeAnnotationProperty(title)}`);
+  return `::${level} ${properties.join(",")}::${escapeAnnotationData(message)}`;
+}
+
 /**
  * Output results as GitHub Actions annotations.
  */
@@ -360,9 +399,10 @@ export function reportCI(
   summary: ReportSummary = buildSummary(result)
 ): void {
   for (const r of summary.results) {
+    const title = `${r.adrId}/${r.ruleId}`;
     if (r.error !== undefined && r.error !== "") {
       console.log(
-        `::error title=${r.adrId}/${r.ruleId}::Rule execution error: ${r.error}`
+        annotation("error", title, `Rule execution error: ${r.error}`)
       );
     }
 
@@ -373,39 +413,43 @@ export function reportCI(
           : v.severity === "warning"
             ? "warning"
             : "notice";
-      const filePart =
-        v.file !== undefined && v.file !== "" ? ` file=${v.file}` : "";
-      const linePart =
-        v.line !== undefined && v.line !== 0 ? `,line=${v.line}` : "";
-      console.log(
-        `::${level}${filePart}${linePart} title=${r.adrId}/${r.ruleId}::${v.message}`
-      );
+      console.log(annotation(level, title, v.message, v));
     }
   }
 
   for (const w of summary.suppressionWarnings) {
-    const filePart = w.file ? ` file=${w.file}` : "";
-    const linePart = w.line ? `,line=${w.line}` : "";
-    console.log(
-      `::warning${filePart}${linePart} title=suppression::${w.message}`
-    );
+    console.log(annotation("warning", "suppression", w.message, w));
   }
 
   for (const w of summary.briefingWarnings) {
     console.log(
-      `::warning file=${w.file} title=briefing-budget::${w.adrId} "${w.section}" is ${w.length} chars; review-context truncates at ${w.cap}`
+      annotation(
+        "warning",
+        "briefing-budget",
+        `${w.adrId} "${w.section}" is ${w.length} chars; review-context truncates at ${w.cap}`,
+        { file: w.file }
+      )
     );
   }
 
   for (const file of summary.unparsedAdrs) {
     console.log(
-      `::warning file=${file} title=unparsed-adr::ADR could not be parsed and was excluded from every check`
+      annotation(
+        "warning",
+        "unparsed-adr",
+        "ADR could not be parsed and was excluded from every check",
+        { file }
+      )
     );
   }
 
   if (summary.strictAdvisoryExceeded) {
     console.log(
-      "::error title=strict-mode::--strict is set and advisory findings (briefing/suppression/unparsed-ADR warnings) are non-empty"
+      annotation(
+        "error",
+        "strict-mode",
+        "--strict is set and advisory findings (briefing/suppression/unparsed-ADR warnings) are non-empty"
+      )
     );
   }
 

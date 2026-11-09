@@ -273,7 +273,7 @@ describe("reporter diagnostics rendering", () => {
         )
       );
       expect(output()).toContain(
-        "::warning file=src/a.ts,line=3 title=suppression::Missing reason"
+        "::warning file=src/a.ts,line=3,title=suppression::Missing reason"
       );
       expect(output()).toContain(
         "::warning title=suppression::Unused suppression"
@@ -298,7 +298,7 @@ describe("reporter diagnostics rendering", () => {
         )
       );
       expect(output()).toContain(
-        "::warning file=.archgate/adrs/ARCH-002.md title=briefing-budget::"
+        "::warning file=.archgate/adrs/ARCH-002.md,title=briefing-budget::"
       );
       expect(output()).toContain(
         "is 3000 chars; review-context truncates at 2000"
@@ -308,7 +308,7 @@ describe("reporter diagnostics rendering", () => {
     test("annotates unparsed ADRs", () => {
       reportCI(makeResult({}, { unparsedAdrs: [".archgate/adrs/broken.md"] }));
       expect(output()).toContain(
-        "::warning file=.archgate/adrs/broken.md title=unparsed-adr::ADR could not be parsed"
+        "::warning file=.archgate/adrs/broken.md,title=unparsed-adr::ADR could not be parsed"
       );
     });
   });

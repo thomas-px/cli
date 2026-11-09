@@ -216,10 +216,58 @@ describe("reporter", () => {
           ],
         })
       );
-      const output = logs.join("\n");
-      expect(output).toContain("::error");
-      expect(output).toContain("file=src/foo.ts");
-      expect(output).toContain("line=10");
+      expect(logs).toContain(
+        "::error file=src/foo.ts,line=10,title=TEST-001/test-rule::violation msg"
+      );
+    });
+
+    function annotate(
+      violation: Partial<CheckResult["results"][0]["violations"][0]>
+    ): string {
+      reportCI(
+        makeResult({
+          violations: [
+            {
+              ruleId: "r",
+              adrId: "a",
+              message: "msg",
+              severity: "error",
+              ...violation,
+            },
+          ],
+        })
+      );
+      return logs[0];
+    }
+
+    test("spans the annotation to endLine", () => {
+      expect(annotate({ file: "src/foo.ts", line: 3, endLine: 5 })).toBe(
+        "::error file=src/foo.ts,line=3,endLine=5,title=TEST-001/test-rule::msg"
+      );
+    });
+
+    test("leaves out line 0", () => {
+      expect(annotate({ file: "src/foo.ts", line: 0 })).toBe(
+        "::error file=src/foo.ts,title=TEST-001/test-rule::msg"
+      );
+    });
+
+    test("leaves out line without a file", () => {
+      expect(annotate({ line: 3 })).toBe(
+        "::error title=TEST-001/test-rule::msg"
+      );
+    });
+
+    test("escapes property separators in file paths", () => {
+      expect(annotate({ file: "src/a,b:c.ts" })).toBe(
+        "::error file=src/a%2Cb%3Ac.ts,title=TEST-001/test-rule::msg"
+      );
+    });
+
+    test("keeps a multi-line message in one annotation", () => {
+      expect(annotate({ message: "100% wrong\r\nsee ADR" })).toBe(
+        "::error title=TEST-001/test-rule::100%25 wrong%0D%0Asee ADR"
+      );
     });
 
     test("outputs warning annotations", () => {
